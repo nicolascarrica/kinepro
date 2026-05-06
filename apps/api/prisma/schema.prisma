@@ -1,0 +1,273 @@
+// =============================================================
+//  KinePro - Esquema Prisma
+// =============================================================
+//  Cada modelo identifica las HU del HU.docx que cubre.
+//  Ver README.md raiz para la matriz HU - codigo - pantalla.
+//
+//  NOTA: SQLite no soporta enums nativos. Todos los "enums"
+//  estan modelados como String, validados desde la app y
+//  expuestos como TypeScript const objects en
+//  apps/api/src/common/enums.ts. La forma de uso (Role.PACIENTE,
+//  etc.) se mantiene identica.
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------------------------------------------
+//  Roles del sistema (string en BD, enum en TS):
+//    PACIENTE       -> autogestion de sus turnos / pagos
+//    ADMINISTRATIVO -> agenda, lista de espera, asistencia
+//    OWNER          -> precios, reportes, usuarios internos
+//
+//  UserStatus       : ACTIVO | BLOQUEADO
+//  AppointmentStatus: RESERVADO | CANCELADO | CANCELADO_CENTRO
+//                     | REPROGRAMADO | ASISTIO | AUSENTE
+//  AppointmentType  : POR_DEMANDA | FIJO
+//  WaitlistTier     : MENSUAL | OCASIONAL
+//  PaymentStatus    : PENDIENTE | APROBADO | RECHAZADO
+//  PaymentMethod    : MERCADOPAGO | EFECTIVO | POSNET
+//  NotificationChannel: EMAIL | IN_APP
+//  NotificationKind : TURNO_CONFIRMADO | TURNO_CANCELADO |
+//                     RECORDATORIO | TURNO_LIBERADO |
+//                     PAGO_REGISTRADO | CUENTA_BLOQUEADA
+// -------------------------------------------------------------
+
+// -------------------------------------------------------------
+//  Usuarios del sistema (cubre HUs de Control de accesos)
+//    HU: Registrar usuario / Iniciar sesion / Cerrar sesion
+//    HU: Modificar contrasena / Restablecer contrasena
+//    HU: Desbloquear cuenta / Modificar datos personales
+//    HU NUEVA: Crear usuario interno (Owner)
+// -------------------------------------------------------------
+model User {
+  id                  String    @id @default(cuid())
+  role                String    // ver enum Role
+  status              String    @default("ACTIVO") // ver enum UserStatus
+
+  nombre              String
+  apellido            String
+  dni                 String?   @unique
+  email               String    @unique
+  telefono            String?   @unique
+  fechaNacimiento     DateTime?
+
+  passwordHash        String
+  failedLoginAttempts Int       @default(0)
+  passwordMustChange  Boolean   @default(false)
+  resetToken          String?   @unique
+  resetTokenExpiresAt DateTime?
+  unlockToken         String?   @unique
+
+  // Plan del paciente: condiciona prioridad en lista de espera y descuentos
+  planMensual         Boolean   @default(false)
+
+  appointments        Appointment[]    @relation("PacienteAppointments")
+  waitlistEntries     WaitlistEntry[]
+  payments            Payment[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([role])
+}
+
+// -------------------------------------------------------------
+//  Actividades del centro (Tren superior, medio, inferior, etc.)
+//    HU: Crear / Modificar / Eliminar actividad
+//
+//  Las actividades describen los tipos de tratamiento que ofrece
+//  el centro. Cada paciente elige una actividad al reservar un
+//  horario. La capacidad sugerida queda como referencia, pero el
+//  cupo real lo define el horario (Slot).
+// -------------------------------------------------------------
+model Activity {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  capacidad   Int      // capacidad sugerida (referencia)
+  descripcion String?
+
+  appointments Appointment[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+//  Slot = franja horaria del centro (no esta atada a una actividad).
+//  Un mismo horario tiene un cupo total compartido y dentro de el
+//  cada paciente elige el tipo de tratamiento (actividad).
+//    HU: Crear turno (Admin)
+//    HU: Cancelar turno por el centro (HU NUEVA)
+// -------------------------------------------------------------
+model Slot {
+  id           String   @id @default(cuid())
+
+  startsAt     DateTime @unique // un solo horario por momento (slot semanal)
+  cupo         Int               // cantidad total de pacientes que entran
+
+  cancelado    Boolean  @default(false)
+  motivoCancel String?
+
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([startsAt])
+}
+
+// -------------------------------------------------------------
+//  Reserva concreta de un paciente sobre un slot
+//    HU: Reservar turno por demanda / Reservar turnos fijos
+//    HU: Cancelar turno (paciente) / Reprogramar turno
+//    HU: Listar turnos / Consultar historial / Controlar asistencia
+// -------------------------------------------------------------
+model Appointment {
+  id              String   @id @default(cuid())
+  pacienteId      String
+  paciente        User     @relation("PacienteAppointments", fields: [pacienteId], references: [id])
+  slotId          String
+  slot            Slot     @relation(fields: [slotId], references: [id])
+
+  // El paciente elige la actividad al reservar el horario.
+  activityId      String
+  activity        Activity @relation(fields: [activityId], references: [id])
+
+  type            String   @default("POR_DEMANDA") // ver enum AppointmentType
+  status          String   @default("RESERVADO")   // ver enum AppointmentStatus
+
+  reprogramacionesUsadas Int @default(0)
+
+  // Precio congelado al momento de la reserva (HU Configurar precios).
+  precio          Float
+  descuentoPct    Float    @default(0)
+
+  monthlyBookingId String?
+  monthlyBooking   MonthlyBooking? @relation(fields: [monthlyBookingId], references: [id])
+
+  payment         Payment?
+
+  attendanceMarkedAt DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([pacienteId, status])
+  @@index([slotId, status])
+}
+
+// -------------------------------------------------------------
+//  Reserva mensual fija (4 turnos del mismo dia/hora).
+//    HU: Reservar turnos fijos
+// -------------------------------------------------------------
+model MonthlyBooking {
+  id           String        @id @default(cuid())
+  pacienteId   String
+  desde        DateTime
+  hasta        DateTime
+  appointments Appointment[]
+
+  createdAt    DateTime      @default(now())
+}
+
+// -------------------------------------------------------------
+//  Lista de espera por slot, separada en dos colas (mensual / ocasional).
+//    HU: Anotarse / Baja / Confirmar turno ofrecido
+//    HU: Prioridad lista de espera segun plan
+//    HU: Agregar / Dar de baja paciente (personal)
+// -------------------------------------------------------------
+model WaitlistEntry {
+  id           String   @id @default(cuid())
+  slotId       String
+  slot         Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  pacienteId   String
+  paciente     User     @relation(fields: [pacienteId], references: [id])
+  tier         String   // ver enum WaitlistTier
+  posicion     Int
+
+  ofrecidoAt    DateTime?
+  respondeAntes DateTime?
+
+  createdAt    DateTime @default(now())
+
+  @@unique([slotId, pacienteId])
+  @@index([slotId, tier, posicion])
+}
+
+// -------------------------------------------------------------
+//  Pagos (online + presenciales)
+//    HU: Pagar turno con MercadoPago (mock)
+//    HU: Registrar pago presencial
+//    HU: Generar comprobante / Consultar historial
+//    HU: Aplicar penalizacion en el calculo del monto
+// -------------------------------------------------------------
+model Payment {
+  id              String   @id @default(cuid())
+  appointmentId   String   @unique
+  appointment     Appointment @relation(fields: [appointmentId], references: [id])
+  pacienteId      String
+  paciente        User     @relation(fields: [pacienteId], references: [id])
+
+  monto           Float
+  metodo          String   // ver enum PaymentMethod
+  status          String   @default("PENDIENTE") // ver enum PaymentStatus
+  externalRef     String?
+  comprobanteId   String?  @unique
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+//  Notificaciones (HU Recibir notificaciones de turnos / liberados).
+// -------------------------------------------------------------
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  channel     String   @default("IN_APP") // ver enum NotificationChannel
+  kind        String   // ver enum NotificationKind
+  asunto      String
+  cuerpo      String
+  leida       Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, leida])
+}
+
+// -------------------------------------------------------------
+//  Configuracion global - precio por sesion y descuento mensual.
+//    HU NUEVA: Configurar precios y descuento mensual (Owner)
+// -------------------------------------------------------------
+model Settings {
+  id                String   @id @default("singleton")
+  precioPorSesion   Float    @default(5000)
+  descuentoMensual  Float    @default(20)
+  updatedAt         DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+//  Auditoria liviana: quien hizo que.
+// -------------------------------------------------------------
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}

@@ -1,0 +1,21 @@
+{
+  "name": "kinepro",
+  "private": true,
+  "version": "0.1.0",
+  "description": "KinePro - Sistema de gestion de turnos del centro de kinesiologia (Ingenieria de Software II - UNLP)",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces --include-workspace-root=false",
+    "dev:api": "npm --workspace apps/api run start:dev",
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:api": "npm --workspace apps/api run build",
+    "build:web": "npm --workspace apps/web run build",
+    "test:api": "npm --workspace apps/api run test",
+    "seed": "npm --workspace apps/api run seed",
+    "prisma:migrate": "npm --workspace apps/api run prisma:migrate",
+    "prisma:generate": "npm --workspace apps/api run prisma:generate"
+  }
+}

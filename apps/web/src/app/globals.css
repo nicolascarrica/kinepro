@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --kineblue: #005C9C;
+  --progreen: #4AA54D;
+}
+
+html, body {
+  background: #F1F1F1;
+  color: #1A1A1A;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-md font-medium transition-colors px-4 py-2 disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply btn bg-kineblue text-white hover:bg-kineblue-deep;
+}
+
+.btn-success {
+  @apply btn bg-progreen text-white hover:bg-progreen-deep;
+}
+
+.btn-outline {
+  @apply btn border border-kineblue text-kineblue hover:bg-kineblue-light/40;
+}
+
+.card {
+  @apply rounded-xl bg-white shadow-sm border border-neutral-200 p-6;
+}
+
+.input {
+  @apply w-full rounded-md border border-neutral-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-kineblue;
+}
+
+.label {
+  @apply block text-sm font-medium text-neutral-gray mb-1;
+}
+
+.alert-error {
+  @apply rounded-md bg-red-50 text-red-700 px-3 py-2 border border-red-200;
+}
+
+.alert-ok {
+  @apply rounded-md bg-progreen-light/30 text-progreen-deep px-3 py-2 border border-progreen-light;
+}
