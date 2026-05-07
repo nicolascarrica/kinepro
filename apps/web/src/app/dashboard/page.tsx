@@ -37,6 +37,7 @@ function Inner() {
             <Card title="Reservar turno" href="/turnos/reservar" desc="HU: Reservar turno por demanda" />
             <Card title="Mis turnos" href="/turnos/mis-turnos" desc="HU: Listar turnos / Consultar historial" />
             <Card title="Mis notificaciones" href="/notificaciones" desc="HU: Recibir notificaciones de turnos" />
+            <Card title="Mi perfil" href="/perfil" desc="HU: Modificar datos personales / Modificar contraseña" />
           </>
         )}
         {(user.role === 'ADMINISTRATIVO' || user.role === 'OWNER') && (

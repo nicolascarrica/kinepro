@@ -136,10 +136,10 @@ Hay tests para las reglas críticas del backend:
 | ✅ Registrar usuario | `POST /api/auth/register` | `/registro` |
 | ✅ Iniciar sesión (con bloqueo por intentos) | `POST /api/auth/login` | `/login` |
 | ✅ Cerrar sesión | `POST /api/auth/logout` | header `Cerrar sesion` |
-| ✅ Modificar contraseña | `POST /api/auth/change-password` | (perfil) |
+| ✅ Modificar contraseña | `POST /api/auth/change-password` | `/perfil` |
 | ✅ Restablecer contraseña | `POST /api/auth/request-reset` + `POST /api/auth/reset-password` | `/recuperar` |
 | ✅ Desbloquear cuenta | `POST /api/auth/unlock-account` | (mediante token enviado en notificación) |
-| ✅ Modificar datos personales | `POST /api/auth/update-profile` | (perfil) |
+| ✅ Modificar datos personales | `POST /api/auth/update-profile` | `/perfil` |
 | ✅ Controlar asistencia | `POST /api/appointments/attendance/:slotId` | (admin/agenda) |
 | 🆕 Crear usuario interno (Owner) | `POST /api/users/internal` | `/owner/usuarios` |
 | 🆕 Listar usuarios del sistema (Owner) | `GET /api/users` | `/owner/usuarios` |

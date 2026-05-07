@@ -16,8 +16,11 @@ export interface SessionUser {
   nombre: string;
   apellido: string;
   email: string;
+  dni?: string | null;
+  telefono?: string | null;
   role: Role;
   planMensual?: boolean;
+  status?: 'ACTIVO' | 'BLOQUEADO';
 }
 
 interface AuthCtx {

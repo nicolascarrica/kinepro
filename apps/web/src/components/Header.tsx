@@ -59,9 +59,13 @@ export function Header() {
                 </>
               )}
               <NotificationsBell />
-              <span className="opacity-80 hidden md:inline">
+              <Link
+                href="/perfil"
+                className="opacity-80 hidden md:inline hover:underline"
+                title="Mi perfil"
+              >
                 {user.nombre}
-              </span>
+              </Link>
               <button
                 onClick={async () => {
                   await logout();
