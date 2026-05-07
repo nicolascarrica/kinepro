@@ -125,6 +125,9 @@ Hay tests para las reglas críticas del backend:
 
 > ✅ HU original (de `HU.docx`)
 > 🆕 HU nueva (creada por Claude durante el desarrollo, ver `HU-NUEVAS-creadas-por-Claude.docx`)
+>
+> El documento complementario contiene **9 HU** que cubren funcionalidades
+> requeridas por el SRS o por el flujo de la app que no tenían HU previa.
 
 ### Épica: Control de accesos
 
@@ -139,15 +142,19 @@ Hay tests para las reglas críticas del backend:
 | ✅ Modificar datos personales | `POST /api/auth/update-profile` | (perfil) |
 | ✅ Controlar asistencia | `POST /api/appointments/attendance/:slotId` | (admin/agenda) |
 | 🆕 Crear usuario interno (Owner) | `POST /api/users/internal` | `/owner/usuarios` |
+| 🆕 Listar usuarios del sistema (Owner) | `GET /api/users` | `/owner/usuarios` |
+| 🆕 Asignar plan mensual al paciente | `PATCH /api/users/:id/plan` | `/owner/usuarios` |
 
 ### Épica: Gestión de turnos y actividades
 
 | HU | Endpoint | Pantalla |
 |----|----------|----------|
+| 🆕 Listar actividades disponibles | `GET /api/activities` | `/admin/actividades` + selector en `/turnos/reservar` |
 | ✅ Crear actividad | `POST /api/activities` | `/admin/actividades` |
 | ✅ Modificar actividad | `PATCH /api/activities/:id` | `/admin/actividades` |
 | ✅ Eliminar actividad | `DELETE /api/activities/:id` | `/admin/actividades` |
 | ✅ Crear turno | `POST /api/slots` | `/admin/turnos/crear` |
+| 🆕 Generar agenda semanal | `POST /api/slots/week` | `/admin/turnos/crear` (pestaña "Generar semana") |
 | ✅ Reservar turno por demanda | `POST /api/appointments/reserve` | `/turnos/reservar` |
 | ✅ Reservar turnos fijos | (hereda flujo de reserva con `monthlyBooking`) | (extensión de `/turnos/reservar`) |
 | ✅ Cancelar turno (paciente) | `POST /api/appointments/:id/cancel` | `/turnos/mis-turnos` |
@@ -180,7 +187,8 @@ Hay tests para las reglas críticas del backend:
 
 | HU | Endpoint | Pantalla |
 |----|----------|----------|
-| ✅ Recibir notificaciones de turnos (confirmado / cancelado / recordatorio) | `GET /api/notifications` | `/notificaciones` |
+| ✅ Recibir notificaciones de turnos (confirmado / cancelado / recordatorio) | `GET /api/notifications` | campanita 🔔 en header + `/notificaciones` |
+| 🆕 Marcar notificación como leída | `PATCH /api/notifications/:id/read` | dropdown de la campanita |
 | ✅ Notificación de turno liberado (lista de espera) | (Demo 2) | (Demo 2) |
 
 ### Épica: Estadísticas y reportes

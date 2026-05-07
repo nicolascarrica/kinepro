@@ -1,17 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { AuthGuard } from '@/components/AuthGuard';
+import { WeekCalendar, CalendarSlot } from '@/components/WeekCalendar';
 import { api } from '@/lib/api';
 
-interface Slot {
-  id: string;
-  startsAt: string;
-  cupo: number;
-  ocupados: number;
-  cancelado: boolean;
-}
+interface Slot extends CalendarSlot {}
 
 interface Activity {
   id: string;
@@ -22,9 +17,9 @@ interface Activity {
 /**
  * HU "Reservar turno por demanda".
  *
- * Modelo: cada horario es una franja con cupo total. Al elegir un
- * horario el paciente selecciona ademas el tipo de tratamiento
- * (actividad).
+ * Vista calendario semanal: dias en columnas, horas en filas.
+ * Click en una celda con cupo abre un modal para elegir el tipo
+ * de tratamiento.
  */
 export default function ReservarPage() {
   return (
@@ -37,7 +32,7 @@ export default function ReservarPage() {
 }
 
 function Inner() {
-  const [slots, setSlots] = useState<Slot[] | null>(null);
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [seleccionado, setSeleccionado] = useState<Slot | null>(null);
   const [activitySel, setActivitySel] = useState<string>('');
@@ -45,14 +40,16 @@ function Inner() {
   const [ok, setOk] = useState<string | null>(null);
 
   async function load() {
+    // traemos un rango amplio (4 semanas) para que la navegacion
+    // entre semanas dentro del calendario no requiera otro fetch.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const next = new Date(today);
-    next.setDate(next.getDate() + 14);
+    next.setDate(next.getDate() + 28);
     const data = await api<Slot[]>(
       `/slots?from=${encodeURIComponent(today.toISOString())}&to=${encodeURIComponent(next.toISOString())}`,
     );
-    setSlots(data.filter((s) => !s.cancelado));
+    setSlots(data);
   }
 
   useEffect(() => {
@@ -62,23 +59,6 @@ function Inner() {
       if (a[0]) setActivitySel(a[0].id);
     });
   }, []);
-
-  // agrupar por dia
-  const slotsPorDia = useMemo(() => {
-    if (!slots) return {};
-    const grupos: Record<string, Slot[]> = {};
-    for (const s of slots) {
-      const d = new Date(s.startsAt);
-      const key = d.toLocaleDateString('es-AR', {
-        weekday: 'long',
-        day: '2-digit',
-        month: '2-digit',
-      });
-      grupos[key] = grupos[key] ?? [];
-      grupos[key].push(s);
-    }
-    return grupos;
-  }, [slots]);
 
   async function confirmar() {
     if (!seleccionado || !activitySel) return;
@@ -105,65 +85,67 @@ function Inner() {
       <h1 className="text-2xl font-bold text-kineblue-deep mb-2">
         Reservar turno
       </h1>
-      <p className="text-neutral-gray mb-6">
-        Eligi un horario disponible. Despues seleccionas el tratamiento que
-        queres hacer (Tren superior, medio o inferior).
+      <p className="text-neutral-gray mb-4">
+        Eligi un horario disponible en el calendario y despues seleccionas el
+        tratamiento que queres hacer.
       </p>
 
       {error && <div className="alert-error mb-4">{error}</div>}
       {ok && <div className="alert-ok mb-4">{ok}</div>}
 
-      {slots === null ? (
-        <p className="text-neutral-gray">Cargando turnos...</p>
-      ) : Object.keys(slotsPorDia).length === 0 ? (
-        <p className="text-neutral-gray">
-          No hay turnos disponibles en los proximos 14 dias.
-        </p>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(slotsPorDia).map(([dia, dslots]) => (
-            <section key={dia}>
-              <h2 className="text-lg font-semibold text-kineblue-deep capitalize mb-3">
-                {dia}
-              </h2>
-              <div className="grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {dslots.map((s) => {
-                  const lleno = s.ocupados >= s.cupo;
-                  const horario = new Date(s.startsAt).toLocaleTimeString('es-AR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-                  return (
-                    <button
-                      key={s.id}
-                      disabled={lleno}
-                      onClick={() => setSeleccionado(s)}
-                      className={`rounded-lg border p-3 text-left transition ${
-                        lleno
-                          ? 'opacity-40 cursor-not-allowed border-neutral-200 bg-white'
-                          : 'border-kineblue/30 bg-white hover:border-kineblue hover:bg-kineblue-light/10'
-                      }`}
-                    >
-                      <div className="text-lg font-semibold text-kineblue-deep">
-                        {horario}
-                      </div>
-                      <div
-                        className={`text-xs mt-1 ${lleno ? 'text-red-600' : 'text-progreen-deep'}`}
-                      >
-                        {lleno
-                          ? 'Sin cupo'
-                          : `${s.cupo - s.ocupados} cupo(s) disponibles`}
-                      </div>
-                    </button>
-                  );
-                })}
+      <WeekCalendar<Slot>
+        slots={slots}
+        onSlotClick={(s) => {
+          if (s.cancelado) return;
+          if (s.ocupados >= s.cupo) return;
+          if (new Date(s.startsAt) < new Date()) return;
+          setSeleccionado(s);
+        }}
+        renderCell={(s) => {
+          if (!s) {
+            return <span className="text-xs text-neutral-300">—</span>;
+          }
+          if (s.cancelado) {
+            return (
+              <div className="rounded bg-red-50 border border-red-200 px-2 py-1">
+                <div className="text-xs font-semibold text-red-600">
+                  Cancelado
+                </div>
               </div>
-            </section>
-          ))}
-        </div>
-      )}
+            );
+          }
+          const lleno = s.ocupados >= s.cupo;
+          const pasado = new Date(s.startsAt) < new Date();
+          if (pasado) {
+            return (
+              <div className="rounded bg-neutral-50 border border-neutral-200 px-2 py-1 opacity-60">
+                <div className="text-xs text-neutral-gray">Pasado</div>
+              </div>
+            );
+          }
+          return (
+            <div
+              className={`rounded px-2 py-1 border ${
+                lleno
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-progreen-light/20 border-progreen-light hover:bg-progreen-light/40'
+              }`}
+            >
+              <div
+                className={`text-xs font-semibold ${
+                  lleno ? 'text-red-700' : 'text-progreen-deep'
+                }`}
+              >
+                {lleno ? 'Sin cupo' : `${s.cupo - s.ocupados} libre(s)`}
+              </div>
+              <div className="text-[10px] text-neutral-gray mt-0.5">
+                {s.ocupados}/{s.cupo}
+              </div>
+            </div>
+          );
+        }}
+      />
 
-      {/* Modal simple de seleccion de actividad */}
       {seleccionado && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
