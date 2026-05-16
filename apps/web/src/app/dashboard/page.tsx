@@ -34,17 +34,20 @@ function Inner() {
       <section className="grid md:grid-cols-3 gap-4 mt-8">
         {user.role === 'PACIENTE' && (
           <>
-            <Card title="Reservar turno" href="/turnos/reservar" desc="HU: Reservar turno por demanda" />
-            <Card title="Mis turnos" href="/turnos/mis-turnos" desc="HU: Listar turnos / Consultar historial" />
+            <Card title="Reservar turno" href="/turnos/reservar" desc="HU #32: Reservar turno por demanda" />
+            <Card title="Reservar mensualmente" href="/turnos/reservar-mensual" desc="HU #42: Reserva de turnos fijos" />
+            <Card title="Mis turnos" href="/turnos/mis-turnos" desc="Visualizar / cancelar / reprogramar" />
+            <Card title="Mis pagos" href="/mis-pagos" desc="HU #12: Comprobantes de pago" />
             <Card title="Mis notificaciones" href="/notificaciones" desc="HU: Recibir notificaciones de turnos" />
-            <Card title="Mi perfil" href="/perfil" desc="HU: Modificar datos personales / Modificar contraseña" />
+            <Card title="Mi perfil" href="/perfil" desc="HU #31 / #28: Modificar datos / contraseña" />
           </>
         )}
         {(user.role === 'ADMINISTRATIVO' || user.role === 'OWNER') && (
           <>
-            <Card title="Agenda general" href="/admin/agenda" desc="HU: Listar agenda general (HU NUEVA)" />
-            <Card title="Actividades" href="/admin/actividades" desc="HU: Crear / Modificar / Eliminar actividad" />
-            <Card title="Crear turno" href="/admin/turnos/crear" desc="HU: Crear turno" />
+            <Card title="Agenda general" href="/admin/agenda" desc="HU #51: Visualizar turnos (personal)" />
+            <Card title="Actividades" href="/admin/actividades" desc="HU #39/#40/#41: ABM de actividades" />
+            <Card title="Crear turno" href="/admin/turnos/crear" desc="HU #35: Crear turno" />
+            <Card title="Pagos" href="/admin/pagos" desc="HU #9: Registrar pago presencial" />
           </>
         )}
         {user.role === 'OWNER' && (

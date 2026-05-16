@@ -218,7 +218,6 @@ function PasswordForm() {
           className="input"
           type="password"
           required
-          minLength={8}
           value={form.nueva}
           onChange={(e) => setForm({ ...form, nueva: e.target.value })}
         />
@@ -229,7 +228,6 @@ function PasswordForm() {
           className="input"
           type="password"
           required
-          minLength={8}
           value={form.repetir}
           onChange={(e) => setForm({ ...form, repetir: e.target.value })}
         />

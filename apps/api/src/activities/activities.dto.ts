@@ -1,17 +1,17 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
+/**
+ * HU #39 "Crear actividad" (v2): solo se pide el nombre.
+ */
 export class CreateActivityDto {
-  @IsString() nombre!: string;
-  @IsInt() @Min(1, { message: 'No se pueden crear actividades sin capacidad' })
-  capacidad!: number;
+  @IsString() @MinLength(1) nombre!: string;
   @IsOptional() @IsString() descripcion?: string;
 }
 
+/**
+ * HU #40 "Modificar actividad" (v2): solo se modifica el nombre.
+ */
 export class UpdateActivityDto {
-  @IsOptional() @IsString() nombre?: string;
-  @IsOptional() @IsInt() @Min(1, {
-    message: 'La actividad no puede tener capacidad 0',
-  })
-  capacidad?: number;
+  @IsString() @MinLength(1) nombre!: string;
   @IsOptional() @IsString() descripcion?: string;
 }

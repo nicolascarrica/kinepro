@@ -60,7 +60,7 @@ export class AuthService {
       where: { telefono: dto.telefono },
     });
     if (conflictTel) {
-      throw new BadRequestException('El telefono ya se encuentra registrado');
+      throw new BadRequestException('El teléfono ya se encuentra registrado');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -79,7 +79,8 @@ export class AuthService {
       },
     });
 
-    return this.publicProfile(user);
+    // HU #25 escenario 1: "Registro exitoso".
+    return { ...this.publicProfile(user), mensaje: 'Registro exitoso' };
   }
 
   // ----------------------------------------------------------
@@ -129,7 +130,7 @@ export class AuthService {
           },
         });
         throw new UnauthorizedException(
-          'Datos incorrectos. La cuenta fue bloqueada y se le envio un mail al correo asociado para desbloquearla',
+          'Datos incorrectos. La cuenta fue bloqueada y se le envió un mail al correo asociado para desbloquearla',
         );
       }
       throw new UnauthorizedException('Datos incorrectos');
@@ -162,12 +163,12 @@ export class AuthService {
 
     const ok = await bcrypt.compare(dto.actual, user.passwordHash);
     if (!ok) {
-      throw new BadRequestException('La contrasena actual es incorrecta');
+      throw new BadRequestException('La contraseña actual es incorrecta');
     }
 
     if (await bcrypt.compare(dto.nueva, user.passwordHash)) {
       throw new BadRequestException(
-        'La contrasena nueva debe ser distinta a la actual',
+        'La contraseña nueva debe ser distinta a la actual',
       );
     }
 
@@ -176,7 +177,8 @@ export class AuthService {
       where: { id: userId },
       data: { passwordHash, passwordMustChange: false },
     });
-    return { ok: true, mensaje: 'Modificacion exitosa' };
+    // HU #28 escenario 1: "Modificación exitosa".
+    return { ok: true, mensaje: 'Modificación exitosa' };
   }
 
   // ----------------------------------------------------------
@@ -204,7 +206,11 @@ export class AuthService {
       where: { id: userId },
       data: dto,
     });
-    return this.publicProfile(user);
+    // HU #31 escenario 1: "Modificación de datos exitosa".
+    return {
+      ...this.publicProfile(user),
+      mensaje: 'Modificación de datos exitosa',
+    };
   }
 
   // ----------------------------------------------------------
@@ -216,7 +222,7 @@ export class AuthService {
       where: { email: dto.email },
     });
     const mensaje =
-      'Si la direccion proporcionada pertenece a una cuenta, recibiras un enlace para restablecer tu contrasena';
+      'Si la dirección proporcionada pertenece a una cuenta, recibirás un enlace para restablecer tu contraseña';
 
     if (!user) {
       return { ok: true, mensaje };
@@ -257,7 +263,7 @@ export class AuthService {
     }
 
     if (await bcrypt.compare(dto.nueva, user.passwordHash)) {
-      throw new BadRequestException('La contrasena debe ser distinta a la actual');
+      throw new BadRequestException('La contraseña debe ser distinta a la actual');
     }
 
     const passwordHash = await bcrypt.hash(dto.nueva, 10);
@@ -271,6 +277,7 @@ export class AuthService {
       },
     });
 
+    // HU #29 escenario 3: "Restablecimiento exitoso".
     return { ok: true, mensaje: 'Restablecimiento exitoso' };
   }
 
@@ -292,6 +299,7 @@ export class AuthService {
         failedLoginAttempts: 0,
       },
     });
+    // HU #30 escenario 1: "Desbloqueo exitoso".
     return { ok: true, mensaje: 'Desbloqueo exitoso' };
   }
 

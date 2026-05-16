@@ -1,28 +1,24 @@
 import { IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 /**
- * HU "Crear turno":
- *   Reglas:
- *     - Duracion 60 minutos (implicito).
- *     - Solo lunes a viernes.
- *     - Hora de inicio entre 07:00 y 20:00 (cierre 21:00).
- *     - Cada horario es una franja unica con un cupo total
- *       compartido por todas las actividades.
+ * HU #35 "Crear turno":
+ *   - Duracion 60 minutos.
+ *   - L a V, 07:00 a 20:00 (cierre 21:00).
+ *   - Cada horario solo puede contener una actividad especifica.
  */
 export class CreateSlotDto {
-  @IsDateString() startsAt!: string; // ISO en hora local
-  @IsInt() @Min(1) cupo!: number;
+  @IsString() activityId!: string;
+  @IsDateString() startsAt!: string;
+  @IsOptional() @IsInt() @Min(1) cupo?: number;
 }
 
 /**
- * Genera de un saque toda la semana (L-V) con un cupo dado.
- *  - desde: fecha YYYY-MM-DD del lunes.
- *  - cupo: cupo total por horario.
- *  - horaInicio / horaFin: rango horario (default 7-20).
+ * Generar la semana de una actividad de un saque (utilidad admin).
  */
 export class GenerateWeekDto {
+  @IsString() activityId!: string;
   @IsDateString() desde!: string;
-  @IsInt() @Min(1) cupo!: number;
+  @IsOptional() @IsInt() @Min(1) cupo?: number;
   @IsOptional() @IsInt() horaInicio?: number;
   @IsOptional() @IsInt() horaFin?: number;
 }

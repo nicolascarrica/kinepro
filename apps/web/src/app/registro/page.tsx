@@ -36,6 +36,18 @@ export default function RegistroPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Validaciones con los mensajes EXACTOS de la HU #25 (en lugar de
+    // dejar que el navegador muestre su propio mensaje de validacion).
+    if (form.edad < 13) {
+      setError('La edad mínima para registrarse es 13 años');
+      return;
+    }
+    if (form.password.length < 8) {
+      setError('La contraseña debe contener mínimo 8 caracteres');
+      return;
+    }
+
     setBusy(true);
     try {
       await api('/auth/register', {
@@ -99,7 +111,6 @@ export default function RegistroPage() {
               className="input"
               type="number"
               required
-              min={13}
               value={form.edad}
               onChange={(e) => update('edad', Number(e.target.value))}
             />
@@ -124,12 +135,11 @@ export default function RegistroPage() {
             />
           </div>
           <div className="col-span-2">
-            <label className="label">Contrasena (minimo 8 caracteres)</label>
+            <label className="label">Contraseña (mínimo 8 caracteres)</label>
             <input
               className="input"
               type="password"
               required
-              minLength={8}
               value={form.password}
               onChange={(e) => update('password', e.target.value)}
             />

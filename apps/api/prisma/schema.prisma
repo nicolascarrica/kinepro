@@ -82,19 +82,19 @@ model User {
 
 // -------------------------------------------------------------
 //  Actividades del centro (Tren superior, medio, inferior, etc.)
-//    HU: Crear / Modificar / Eliminar actividad
-//
-//  Las actividades describen los tipos de tratamiento que ofrece
-//  el centro. Cada paciente elige una actividad al reservar un
-//  horario. La capacidad sugerida queda como referencia, pero el
-//  cupo real lo define el horario (Slot).
+//    HU #39: Crear actividad
+//    HU #40: Modificar actividad (solo nombre)
+//    HU #41: Eliminar actividad
 // -------------------------------------------------------------
 model Activity {
   id          String   @id @default(cuid())
   nombre      String   @unique
-  capacidad   Int      // capacidad sugerida (referencia)
+  // capacidad por turno; en HU v2 no se pide al crear/modificar
+  // la actividad, por eso tiene default y no se expone en la UI.
+  capacidad   Int      @default(8)
   descripcion String?
 
+  slots        Slot[]
   appointments Appointment[]
 
   createdAt   DateTime @default(now())
@@ -102,17 +102,19 @@ model Activity {
 }
 
 // -------------------------------------------------------------
-//  Slot = franja horaria del centro (no esta atada a una actividad).
-//  Un mismo horario tiene un cupo total compartido y dentro de el
-//  cada paciente elige el tipo de tratamiento (actividad).
-//    HU: Crear turno (Admin)
-//    HU: Cancelar turno por el centro (HU NUEVA)
+//  Slot = (actividad, dia, hora). Una sola actividad por horario
+//  (HU #35 Crear turno: "Cada horario solo puede contener una
+//  actividad especifica").
+//    HU #35: Crear turno
+//    HU complementaria: Cancelar turno por el centro
 // -------------------------------------------------------------
 model Slot {
   id           String   @id @default(cuid())
+  activityId   String
+  activity     Activity @relation(fields: [activityId], references: [id], onDelete: Restrict)
 
-  startsAt     DateTime @unique // un solo horario por momento (slot semanal)
-  cupo         Int               // cantidad total de pacientes que entran
+  startsAt     DateTime
+  cupo         Int
 
   cancelado    Boolean  @default(false)
   motivoCancel String?
@@ -123,6 +125,7 @@ model Slot {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@unique([activityId, startsAt])
   @@index([startsAt])
 }
 

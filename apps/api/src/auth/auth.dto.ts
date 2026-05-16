@@ -20,9 +20,9 @@ export class RegisterDto {
   @IsString() @Matches(/^\d{6,10}$/) dni!: string;
   @IsEmail() email!: string;
   @IsString() telefono!: string;
-  @IsInt() @Min(13, { message: 'La edad minima para registrarse es 13 anios' })
+  @IsInt() @Min(13, { message: 'La edad mínima para registrarse es 13 años' })
   edad!: number;
-  @IsString() @MinLength(8, { message: 'La contrasena debe contener minimo 8 caracteres' })
+  @IsString() @MinLength(8, { message: 'La contraseña debe contener mínimo 8 caracteres' })
   password!: string;
 }
 

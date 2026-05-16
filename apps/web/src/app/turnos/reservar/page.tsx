@@ -1,25 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { PageShell } from '@/components/PageShell';
 import { AuthGuard } from '@/components/AuthGuard';
 import { WeekCalendar, CalendarSlot } from '@/components/WeekCalendar';
 import { api } from '@/lib/api';
 
-interface Slot extends CalendarSlot {}
-
-interface Activity {
-  id: string;
-  nombre: string;
-  descripcion?: string | null;
+interface Slot extends CalendarSlot {
+  activityId: string;
+  activityName: string;
 }
 
 /**
- * HU "Reservar turno por demanda".
- *
- * Vista calendario semanal: dias en columnas, horas en filas.
- * Click en una celda con cupo abre un modal para elegir el tipo
- * de tratamiento.
+ * HU #32 Reservar turno por demanda.
+ * Cada celda del calendario tiene la actividad pre-asignada
+ * (HU v2: una actividad por horario). El paciente confirma la
+ * reserva en un modal.
  */
 export default function ReservarPage() {
   return (
@@ -31,17 +28,23 @@ export default function ReservarPage() {
   );
 }
 
+const COLORS: Record<string, string> = {
+  'Tren superior': 'bg-progreen-light/30 border-progreen-light text-progreen-deep',
+  'Tren medio': 'bg-kineblue-light/40 border-kineblue-light text-kineblue-deep',
+  'Tren inferior': 'bg-yellow-100 border-yellow-300 text-yellow-800',
+};
+
+function colorOf(name: string) {
+  return COLORS[name] ?? 'bg-neutral-100 border-neutral-300 text-neutral-gray';
+}
+
 function Inner() {
   const [slots, setSlots] = useState<Slot[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
   const [seleccionado, setSeleccionado] = useState<Slot | null>(null);
-  const [activitySel, setActivitySel] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
   async function load() {
-    // traemos un rango amplio (4 semanas) para que la navegacion
-    // entre semanas dentro del calendario no requiera otro fetch.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const next = new Date(today);
@@ -52,25 +55,21 @@ function Inner() {
     setSlots(data);
   }
 
-  useEffect(() => {
-    load();
-    api<Activity[]>('/activities').then((a) => {
-      setActivities(a);
-      if (a[0]) setActivitySel(a[0].id);
-    });
-  }, []);
+  useEffect(() => { load(); }, []);
+
+  const leyenda = useMemo(() => {
+    const set = new Map<string, string>();
+    for (const s of slots) set.set(s.activityName, colorOf(s.activityName));
+    return Array.from(set.entries());
+  }, [slots]);
 
   async function confirmar() {
-    if (!seleccionado || !activitySel) return;
-    setError(null);
-    setOk(null);
+    if (!seleccionado) return;
+    setError(null); setOk(null);
     try {
       await api('/appointments/reserve', {
         method: 'POST',
-        body: JSON.stringify({
-          slotId: seleccionado.id,
-          activityId: activitySel,
-        }),
+        body: JSON.stringify({ slotId: seleccionado.id }),
       });
       setOk('Reserva exitosa');
       setSeleccionado(null);
@@ -82,13 +81,25 @@ function Inner() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-kineblue-deep mb-2">
-        Reservar turno
-      </h1>
-      <p className="text-neutral-gray mb-4">
-        Eligi un horario disponible en el calendario y despues seleccionas el
-        tratamiento que queres hacer.
+      <div className="flex items-baseline justify-between mb-2 gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold text-kineblue-deep">Reservar turno</h1>
+        <Link href="/turnos/reservar-mensual" className="btn-outline text-sm">
+          Reservar mensualmente (HU #42)
+        </Link>
+      </div>
+      <p className="text-neutral-gray mb-3">
+        Cada horario tiene asignada una actividad. Hace click en una celda
+        para reservar.
       </p>
+      {leyenda.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4 text-xs">
+          {leyenda.map(([name, cls]) => (
+            <span key={name} className={`rounded px-2 py-1 border ${cls}`}>
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {error && <div className="alert-error mb-4">{error}</div>}
       {ok && <div className="alert-ok mb-4">{ok}</div>}
@@ -102,44 +113,22 @@ function Inner() {
           setSeleccionado(s);
         }}
         renderCell={(s) => {
-          if (!s) {
-            return <span className="text-xs text-neutral-300">—</span>;
-          }
+          if (!s) return <span className="text-xs text-neutral-300">—</span>;
           if (s.cancelado) {
-            return (
-              <div className="rounded bg-red-50 border border-red-200 px-2 py-1">
-                <div className="text-xs font-semibold text-red-600">
-                  Cancelado
-                </div>
-              </div>
-            );
+            return <div className="rounded border bg-red-50 border-red-200 px-2 py-1 text-xs text-red-600">Cancelado</div>;
+          }
+          if (new Date(s.startsAt) < new Date()) {
+            return <div className="rounded border bg-neutral-50 border-neutral-200 px-2 py-1 text-xs text-neutral-gray opacity-70">Pasado</div>;
           }
           const lleno = s.ocupados >= s.cupo;
-          const pasado = new Date(s.startsAt) < new Date();
-          if (pasado) {
-            return (
-              <div className="rounded bg-neutral-50 border border-neutral-200 px-2 py-1 opacity-60">
-                <div className="text-xs text-neutral-gray">Pasado</div>
-              </div>
-            );
-          }
+          const base = colorOf(s.activityName);
           return (
-            <div
-              className={`rounded px-2 py-1 border ${
-                lleno
-                  ? 'bg-red-50 border-red-200'
-                  : 'bg-progreen-light/20 border-progreen-light hover:bg-progreen-light/40'
-              }`}
-            >
-              <div
-                className={`text-xs font-semibold ${
-                  lleno ? 'text-red-700' : 'text-progreen-deep'
-                }`}
-              >
-                {lleno ? 'Sin cupo' : `${s.cupo - s.ocupados} libre(s)`}
+            <div className={`rounded border px-2 py-1 ${lleno ? 'opacity-50' : ''} ${base}`}>
+              <div className="text-xs font-semibold leading-tight">
+                {s.activityName}
               </div>
-              <div className="text-[10px] text-neutral-gray mt-0.5">
-                {s.ocupados}/{s.cupo}
+              <div className="text-[10px] mt-0.5">
+                {lleno ? 'Sin cupo' : `${s.cupo - s.ocupados} libre(s)`}
               </div>
             </div>
           );
@@ -147,18 +136,13 @@ function Inner() {
       />
 
       {seleccionado && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-          onClick={() => setSeleccionado(null)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSeleccionado(null)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-kineblue-deep">
               Confirmar reserva
             </h3>
             <p className="text-sm text-neutral-gray mt-1">
+              <strong>{seleccionado.activityName}</strong> —{' '}
               {new Date(seleccionado.startsAt).toLocaleString('es-AR', {
                 weekday: 'long',
                 day: '2-digit',
@@ -167,26 +151,11 @@ function Inner() {
                 minute: '2-digit',
               })}
             </p>
-
-            <label className="label mt-4">Tipo de tratamiento</label>
-            <select
-              className="input"
-              value={activitySel}
-              onChange={(e) => setActivitySel(e.target.value)}
-            >
-              {activities.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nombre}
-                  {a.descripcion ? ` - ${a.descripcion}` : ''}
-                </option>
-              ))}
-            </select>
-
+            <p className="text-xs text-neutral-gray mt-3">
+              Cupo disponible: {seleccionado.cupo - seleccionado.ocupados} / {seleccionado.cupo}
+            </p>
             <div className="flex gap-2 mt-6 justify-end">
-              <button
-                className="btn-outline"
-                onClick={() => setSeleccionado(null)}
-              >
+              <button className="btn-outline" onClick={() => setSeleccionado(null)}>
                 Cancelar
               </button>
               <button className="btn-success" onClick={confirmar}>

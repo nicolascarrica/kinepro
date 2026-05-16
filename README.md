@@ -123,11 +123,34 @@ Hay tests para las reglas críticas del backend:
 
 ## Matriz HU ↔ código ↔ pantalla
 
-> ✅ HU original (de `HU.docx`)
+> ✅ HU original (de `HU.docx` / `HU v2.docx`)
 > 🆕 HU nueva (creada por Claude durante el desarrollo, ver `HU-NUEVAS-creadas-por-Claude.docx`)
 >
 > El documento complementario contiene **9 HU** que cubren funcionalidades
 > requeridas por el SRS o por el flujo de la app que no tenían HU previa.
+
+### HU del milestone Demo 1 implementadas
+
+| # | HU | Endpoint principal | Pantalla |
+|---|-----|--------------------|----------|
+| #9  | Registrar pago presencial | `POST /api/payments/cash` | `/admin/pagos` |
+| #12 | Generar comprobante de pago | (automático al confirmar pago) + `GET /api/payments/mine/:id/comprobante` | `/mis-pagos` |
+| #25 | Registrar usuario | `POST /api/auth/register` | `/registro` |
+| #26 | Iniciar sesión (bloqueo 3 intentos) | `POST /api/auth/login` | `/login` |
+| #27 | Cerrar sesión | `POST /api/auth/logout` | header |
+| #28 | Modificar contraseña | `POST /api/auth/change-password` | `/perfil` |
+| #29 | Restablecer contraseña | `POST /api/auth/request-reset` + `POST /api/auth/reset-password` | `/recuperar` + `/restablecer` |
+| #30 | Desbloquear cuenta | `POST /api/auth/unlock-account` | `/desbloquear-cuenta` |
+| #31 | Modificar datos personales | `POST /api/auth/update-profile` | `/perfil` |
+| #32 | Reservar turno por demanda | `POST /api/appointments/reserve` | `/turnos/reservar` |
+| #33 | Reprogramar turno | `POST /api/appointments/:id/reschedule` | `/turnos/mis-turnos` |
+| #34 | Cancelar turno (paciente) | `POST /api/appointments/:id/cancel` | `/turnos/mis-turnos` |
+| #35 | Crear turno | `POST /api/slots` | `/admin/turnos/crear` |
+| #39 | Crear actividad | `POST /api/activities` | `/admin/actividades` |
+| #40 | Modificar actividad | `PATCH /api/activities/:id` | `/admin/actividades` |
+| #41 | Eliminar actividad | `DELETE /api/activities/:id` | `/admin/actividades` |
+| #42 | Reserva de turnos fijos (mensual) | `POST /api/appointments/reserve-monthly` | `/turnos/reservar-mensual` |
+| #51 | Visualizar turnos (personal) | `GET /api/slots` | `/admin/agenda` |
 
 ### Épica: Control de accesos
 

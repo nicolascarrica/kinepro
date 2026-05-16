@@ -8,39 +8,37 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSlotDto, GenerateWeekDto } from './slots.dto';
 
 /**
- * HU "Crear turno", "Listar agenda" y "Cancelar turno por el centro".
+ * HU #35 "Crear turno", HU #51 "Visualizar turnos (personal)" y
+ * la HU complementaria "Cancelar turno por el centro".
  *
- * Reglas de negocio:
- *   - Lunes a Viernes (1..5).
- *   - 07:00 a 20:00 (no se puede crear turno que termine despues de 21:00).
- *   - Un solo slot por (fecha+hora) - cupo compartido entre todas las
- *     actividades.
+ * Reglas v2:
+ *   - L a V (1..5).
+ *   - 07:00 a 20:00 (cierre 21:00).
+ *   - Un solo slot por (actividad, dia, hora).
+ *   - Cada (dia, hora) solo puede tener una actividad asignada.
  */
 @Injectable()
 export class SlotsService {
-  // Constantes de negocio centralizadas para que sean faciles de
-  // ajustar/discutir en la demo.
   static readonly HORA_APERTURA = 7;
-  static readonly HORA_ULTIMO_INICIO = 20; // ultimo turno posible empieza a las 20
-  static readonly DIAS_PERMITIDOS = [1, 2, 3, 4, 5]; // L-V (0=domingo)
+  static readonly HORA_ULTIMO_INICIO = 20;
+  static readonly DIAS_PERMITIDOS = [1, 2, 3, 4, 5];
 
   constructor(private prisma: PrismaService) {}
 
-  // ------------------------------------------------------------------
-  //  HU "Listar agenda general (HU NUEVA)" + listado para reservar.
-  // ------------------------------------------------------------------
-  async list(opts: { from?: Date; to?: Date }) {
+  async list(opts: { from?: Date; to?: Date; activityId?: string }) {
     const where: any = {};
     if (opts.from || opts.to) {
       where.startsAt = {};
       if (opts.from) where.startsAt.gte = opts.from;
       if (opts.to) where.startsAt.lt = opts.to;
     }
+    if (opts.activityId) where.activityId = opts.activityId;
 
     const slots = await this.prisma.slot.findMany({
       where,
       orderBy: { startsAt: 'asc' },
       include: {
+        activity: true,
         appointments: {
           where: {
             status: {
@@ -48,7 +46,6 @@ export class SlotsService {
             },
           },
           include: {
-            activity: { select: { id: true, nombre: true } },
             paciente: { select: { id: true, nombre: true, apellido: true } },
           },
         },
@@ -56,6 +53,8 @@ export class SlotsService {
     });
     return slots.map((s) => ({
       id: s.id,
+      activityId: s.activityId,
+      activityName: s.activity.nombre,
       startsAt: s.startsAt,
       cupo: s.cupo,
       ocupados: s.appointments.length,
@@ -63,37 +62,54 @@ export class SlotsService {
       pacientes: s.appointments.map((a) => ({
         appointmentId: a.id,
         paciente: a.paciente,
-        actividad: a.activity,
         status: a.status,
       })),
     }));
   }
 
-  // ------------------------------------------------------------------
-  //  HU "Crear turno" (un solo horario)
-  // ------------------------------------------------------------------
   async create(dto: CreateSlotDto) {
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: dto.activityId },
+    });
+    if (!activity) throw new NotFoundException('Actividad inexistente');
+
     const startsAt = new Date(dto.startsAt);
     this.validarRangoHorario(startsAt);
     this.validarDiaPermitido(startsAt);
 
-    const existing = await this.prisma.slot.findUnique({
-      where: { startsAt },
+    // Misma actividad + misma fecha/hora -> ya existe
+    const sameActivitySlot = await this.prisma.slot.findFirst({
+      where: { activityId: activity.id, startsAt },
     });
-    if (existing) {
-      throw new BadRequestException('Ya existe un horario para esa fecha y hora');
+    if (sameActivitySlot) {
+      throw new BadRequestException(
+        'La actividad ya existe en el día y horario seleccionado',
+      );
     }
 
-    return this.prisma.slot.create({
-      data: { startsAt, cupo: dto.cupo },
+    // Otra actividad en el mismo dia/hora -> ocupado
+    const conflict = await this.prisma.slot.findFirst({
+      where: { startsAt },
     });
+    if (conflict) {
+      throw new BadRequestException(
+        'El día y horario se encuentra ocupado por otra actividad',
+      );
+    }
+
+    const cupo = dto.cupo ?? activity.capacidad;
+    const slot = await this.prisma.slot.create({
+      data: { activityId: activity.id, startsAt, cupo },
+    });
+    return { ...slot, mensaje: 'Turno creado' };
   }
 
-  // ------------------------------------------------------------------
-  //  Generar agenda semanal de un saque (L-V x rango horario).
-  //  Comodidad para la demo: con un click queda toda la semana lista.
-  // ------------------------------------------------------------------
   async generateWeek(dto: GenerateWeekDto) {
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: dto.activityId },
+    });
+    if (!activity) throw new NotFoundException('Actividad inexistente');
+
     const desde = new Date(dto.desde);
     desde.setHours(0, 0, 0, 0);
     if (desde.getDay() !== 1) {
@@ -109,8 +125,9 @@ export class SlotsService {
       throw new BadRequestException('Rango horario invalido');
     }
 
-    const creados: any[] = [];
-    const omitidos: any[] = [];
+    const cupo = dto.cupo ?? activity.capacidad;
+    let creados = 0;
+    let omitidos = 0;
 
     for (let dia = 0; dia < 5; dia++) {
       for (let h = horaInicio; h <= horaFin; h++) {
@@ -118,14 +135,21 @@ export class SlotsService {
         startsAt.setDate(startsAt.getDate() + dia);
         startsAt.setHours(h, 0, 0, 0);
         try {
-          const slot = await this.prisma.slot.create({
-            data: { startsAt, cupo: dto.cupo },
+          // Si existe slot de OTRA actividad en ese horario, lo saltamos.
+          const conflict = await this.prisma.slot.findFirst({
+            where: { startsAt, NOT: { activityId: activity.id } },
           });
-          creados.push(slot);
+          if (conflict) {
+            omitidos++;
+            continue;
+          }
+          await this.prisma.slot.create({
+            data: { activityId: activity.id, startsAt, cupo },
+          });
+          creados++;
         } catch (e: any) {
           if (e?.code === 'P2002') {
-            // ya existia, lo omitimos sin abortar
-            omitidos.push(startsAt);
+            omitidos++;
           } else {
             throw e;
           }
@@ -134,22 +158,20 @@ export class SlotsService {
     }
     return {
       ok: true,
-      mensaje: `Generados ${creados.length} horarios. ${omitidos.length} ya existian y se omitieron.`,
-      creados: creados.length,
-      omitidos: omitidos.length,
+      mensaje: `Generados ${creados} horarios. ${omitidos} ya existían o estaban ocupados por otra actividad.`,
+      creados,
+      omitidos,
     };
   }
 
-  // ------------------------------------------------------------------
-  //  HU NUEVA "Cancelar turno por el centro"
-  // ------------------------------------------------------------------
   async cancel(id: string, motivo: string) {
     const slot = await this.prisma.slot.findUnique({
       where: { id },
       include: {
+        activity: true,
         appointments: {
           where: { status: AppointmentStatus.RESERVADO },
-          include: { paciente: true, activity: true },
+          include: { paciente: true },
         },
       },
     });
@@ -171,7 +193,6 @@ export class SlotsService {
         where: { id },
         data: { cancelado: true, motivoCancel: motivo },
       });
-
       for (const ap of slot.appointments) {
         await tx.appointment.update({
           where: { id: ap.id },
@@ -183,7 +204,7 @@ export class SlotsService {
             channel: 'IN_APP',
             kind: 'TURNO_CANCELADO',
             asunto: 'Tu turno fue cancelado por el centro',
-            cuerpo: `El turno (${ap.activity.nombre}) del ${slot.startsAt.toLocaleString('es-AR')} fue cancelado. Motivo: ${motivo}. Podes reprogramarlo sin que cuente como reprogramacion propia.`,
+            cuerpo: `Su turno del día ${slot.startsAt.toLocaleString('es-AR')} (${slot.activity.nombre}) ha sido cancelado. Motivo: ${motivo}. Puede reprogramarlo sin que cuente como reprogramación propia.`,
           },
         });
       }
@@ -192,9 +213,6 @@ export class SlotsService {
     return { ok: true, mensaje: 'Turno cancelado por el centro' };
   }
 
-  // ------------------------------------------------------------------
-  //  Validadores de negocio
-  // ------------------------------------------------------------------
   private validarRangoHorario(d: Date) {
     const hora = d.getHours();
     if (hora < SlotsService.HORA_APERTURA || hora > SlotsService.HORA_ULTIMO_INICIO) {
@@ -204,7 +222,7 @@ export class SlotsService {
 
   private validarDiaPermitido(d: Date) {
     if (!SlotsService.DIAS_PERMITIDOS.includes(d.getDay())) {
-      throw new BadRequestException('El dia se encuentra fuera del rango semanal');
+      throw new BadRequestException('El día se encuentra fuera del rango semanal');
     }
   }
 }

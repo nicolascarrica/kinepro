@@ -7,8 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateActivityDto, UpdateActivityDto } from './activities.dto';
 
 /**
- * HU "Crear / Modificar / Eliminar actividad".
- * Las restricciones funcionales viven aca, no en el controller.
+ * HU #39 "Crear actividad", #40 "Modificar actividad",
+ * #41 "Eliminar actividad" segun HU v2.
  */
 @Injectable()
 export class ActivitiesService {
@@ -25,7 +25,8 @@ export class ActivitiesService {
     if (exists) {
       throw new BadRequestException('La actividad ya se encuentra registrada');
     }
-    return this.prisma.activity.create({ data: dto });
+    const a = await this.prisma.activity.create({ data: dto });
+    return { ...a, mensaje: 'La actividad se creó con éxito' };
   }
 
   async update(id: string, dto: UpdateActivityDto) {
@@ -42,24 +43,22 @@ export class ActivitiesService {
         );
       }
     }
-
-    return this.prisma.activity.update({ where: { id }, data: dto });
+    const updated = await this.prisma.activity.update({
+      where: { id },
+      data: dto,
+    });
+    return { ...updated, mensaje: 'La actividad se modificó con éxito' };
   }
 
-  /**
-   * HU "Eliminar actividad":
-   *  - Falla si la actividad tiene turnos activos (reservas vigentes
-   *    de pacientes en horarios futuros).
-   */
   async remove(id: string) {
     const current = await this.prisma.activity.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Actividad inexistente');
 
-    const turnosActivos = await this.prisma.appointment.count({
+    const turnosActivos = await this.prisma.slot.count({
       where: {
         activityId: id,
-        status: 'RESERVADO',
-        slot: { startsAt: { gte: new Date() }, cancelado: false },
+        cancelado: false,
+        startsAt: { gte: new Date() },
       },
     });
     if (turnosActivos > 0) {
@@ -68,6 +67,6 @@ export class ActivitiesService {
       );
     }
     await this.prisma.activity.delete({ where: { id } });
-    return { ok: true, mensaje: 'La actividad se elimino con exito' };
+    return { ok: true, mensaje: 'La actividad se eliminó con éxito' };
   }
 }

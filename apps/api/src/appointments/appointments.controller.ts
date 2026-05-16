@@ -18,6 +18,7 @@ import {
   HistoryQueryDto,
   RescheduleDto,
   ReserveDto,
+  ReserveMonthlyDto,
 } from './appointments.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,28 +26,31 @@ import {
 export class AppointmentsController {
   constructor(private svc: AppointmentsService) {}
 
-  /**
-   * HU "Reservar turno por demanda".
-   * Solo pacientes pueden reservar para si mismos.
-   */
+  /** HU #32 Reservar turno por demanda */
   @Roles(Role.PACIENTE)
   @Post('reserve')
   reserve(@CurrentUser() user: JwtPayload, @Body() dto: ReserveDto) {
-    return this.svc.reservar(user.sub, dto.slotId, dto.activityId);
+    return this.svc.reservar(user.sub, dto.slotId);
   }
 
-  /**
-   * HU "Cancelar turno (paciente)".
-   */
+  /** HU #42 Reserva de turnos fijos (mensual) */
+  @Roles(Role.PACIENTE)
+  @Post('reserve-monthly')
+  reserveMonthly(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: ReserveMonthlyDto,
+  ) {
+    return this.svc.reservarMensual(user.sub, dto.activityId, new Date(dto.desde));
+  }
+
+  /** HU #34 Cancelar turno (paciente) */
   @Roles(Role.PACIENTE)
   @Post(':id/cancel')
   cancel(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.svc.cancelar(user.sub, id);
   }
 
-  /**
-   * HU "Reprogramar turno".
-   */
+  /** HU #33 Reprogramar turno */
   @Roles(Role.PACIENTE)
   @Post(':id/reschedule')
   reschedule(
@@ -54,17 +58,10 @@ export class AppointmentsController {
     @Param('id') id: string,
     @Body() dto: RescheduleDto,
   ) {
-    return this.svc.reprogramar(
-      user.sub,
-      id,
-      dto.nuevoSlotId,
-      dto.activityId,
-    );
+    return this.svc.reprogramar(user.sub, id, dto.nuevoSlotId);
   }
 
-  /**
-   * HU "Consultar historial" / "Listar turnos paciente".
-   */
+  /** Historial / proximos / pasados */
   @Roles(Role.PACIENTE)
   @Get('mine')
   mine(@CurrentUser() user: JwtPayload, @Query() q: HistoryQueryDto) {
@@ -75,9 +72,7 @@ export class AppointmentsController {
     });
   }
 
-  /**
-   * HU "Controlar asistencia" (admin/owner).
-   */
+  /** Controlar asistencia (admin/owner) */
   @Roles(Role.ADMINISTRATIVO, Role.OWNER)
   @Post('attendance/:slotId')
   attendance(

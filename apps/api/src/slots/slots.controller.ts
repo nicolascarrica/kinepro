@@ -26,10 +26,15 @@ export class SlotsController {
    * Listar agenda. Cualquier usuario autenticado puede listar.
    */
   @Get()
-  list(@Query('from') from?: string, @Query('to') to?: string) {
+  list(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('activityId') activityId?: string,
+  ) {
     return this.svc.list({
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
+      activityId,
     });
   }
 

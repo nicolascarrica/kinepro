@@ -33,6 +33,9 @@ export function Header() {
                   <Link href="/turnos/mis-turnos" className="hover:underline">
                     Mis turnos
                   </Link>
+                  <Link href="/mis-pagos" className="hover:underline">
+                    Mis pagos
+                  </Link>
                 </>
               )}
               {(user.role === 'ADMINISTRATIVO' || user.role === 'OWNER') && (
@@ -44,7 +47,10 @@ export function Header() {
                     Actividades
                   </Link>
                   <Link href="/admin/turnos/crear" className="hover:underline">
-                    Crear horario
+                    Crear turno
+                  </Link>
+                  <Link href="/admin/pagos" className="hover:underline">
+                    Pagos
                   </Link>
                 </>
               )}

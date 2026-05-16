@@ -50,8 +50,9 @@ export default function RecuperarPage() {
           </button>
         </form>
         <p className="text-xs text-neutral-gray mt-4">
-          En el MVP el "enlace" se persiste como notificacion en la app del
-          usuario para poder demostrarlo sin necesidad de un servidor SMTP real.
+          En el MVP el "enlace" se persiste como notificación en la app del
+          usuario. Para usarlo, copiá el token y pegalo en{' '}
+          <a className="underline" href="/restablecer">/restablecer</a>.
         </p>
       </div>
     </PageShell>
